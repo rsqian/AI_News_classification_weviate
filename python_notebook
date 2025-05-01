@@ -1,0 +1,74 @@
+import weaviate
+from weaviate.classes.init import Auth
+import os
+
+client = weaviate.connect_to_weaviate_cloud(
+    cluster_url="your cloud url",
+    auth_credentials=Auth.api_key("your API"),
+)
+
+print(client.is_ready())  # Should print: `True`
+
+client.close()  # Free up resources
+
+import weaviate
+from weaviate.classes.init import Auth
+import os
+from weaviate.classes.config import Configure
+
+client.connect()
+
+failed_objects = collection.batch.failed_objects
+if failed_objects:
+    print(f"Number of failed imports: {len(failed_objects)}")
+    print(f"First failed object: {failed_objects[0]}")
+
+
+client.collections.create(
+    "DemoCollection26",
+    vectorizer_config=[
+        Configure.NamedVectors.text2vec_weaviate(
+            name="classification_vector",
+            source_properties=["classification"],
+            model="Snowflake/snowflake-arctic-embed-m-v1.5",
+            # Further options
+            # dimensions=256
+            # base_url="<custom_weaviate_embeddings_url>",
+        )
+    ],
+    # Additional parameters not shown
+)
+
+source_objects = [
+    {"classification": "Acquisition", "description": "Synopsys acquires Ansys for $35 billion to improve silicon-to-systems design solutions."},
+    {"classification": "Valuation milestone", "description": "Reports claim that OpenAI surpassed $2 billion in annualized revenue in December 2023."},
+    {"classification": "Investment/funding", "description": "Figure AI, a humanoid robot startup, raises $675 million at a valuation of $2.6 billion."},
+    {"classification": "Product launch/integration", "description": "Salesforce launches Agentforce, a suite of autonomous AI agents for business operations across its platform."},
+    {"classification": "Partnership", "description": "Microsoft announces a $1.6 billion deal with Constellation Energy to revive the Three Mile Island nuclear reactor to power AI data centers."}
+]
+
+collection = client.collections.get("DemoCollection26")
+
+
+with collection.batch.dynamic() as batch:
+    for src_obj in source_objects:
+        # The model provider integration will automatically vectorize the object
+        batch.add_object(
+            properties={
+                "classification": src_obj["classification"],
+                "description": src_obj["description"],
+            },
+            # vector=vector  # Optionally provide a pre-obtained vector
+        )
+        if batch.number_errors > 10:
+            print("Batch import stopped due to excessive errors.")
+            break
+
+response = collection.query.near_text(
+    query="Cohere, an AI startup specializing in enterprise applications, raises $500 million in funding at a valuation of $5.5 billion.",  # The model provider integration will automatically vectorize the query
+    limit= 2
+)
+
+for obj in response.objects:
+    print(obj.properties["classification"])
+
